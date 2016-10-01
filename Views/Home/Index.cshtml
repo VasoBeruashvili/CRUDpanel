@@ -1,0 +1,149 @@
+﻿@{Layout = "~/Views/Shared/_Sidebar.cshtml";}
+
+<script src="~/Scripts/custom-functions.js"></script>
+<script src="~/Scripts/app.js"></script>
+
+<div class="row" ng-app="tablesApp" ng-controller="tablesCtrl" data-ng-init="init()" style="height: 100% !important;">
+    <!--loader-->
+    <div class="outer" ng-show="showLoader">
+        <div class="middle">
+            <div class="inner">
+                <center>
+                    <img src="~/Content/ajax-loader.gif" />
+                </center>
+            </div>
+        </div>
+    </div>
+
+    <row>
+        <div class="col-md-3" style="height: 100%; background-color: #fbfbfb; border-right: 2px solid #c1c1c1; padding-top: 20px; padding-bottom: 70px;">
+            <input type="text" class="input-sm form-control" style="margin-bottom: 10px;" placeholder="Search table..." ng-model="searchTable" />
+            <div style="height: 100% !important; overflow-y: auto;">
+                <div class="list-group small" style="cursor: pointer;">
+                    <a ng-repeat="table in filteredTables = (tables | filter: searchTable)" class="list-group-item" ng-click="GetTableRecords(table, false)"><i ng-show="table.selected" class="fa fa-check"></i> {{table.schema + '.' + table.name}}</a>
+                </div>
+            </div>
+            <div class="form-inline" style="height: 25px; background-color: #eaeaea; padding-top: 3px; padding-right: 20px; padding-left: 20px; border-bottom-left-radius: 3px; border-bottom-right-radius: 3px;">
+                <span>Number of tables: {{filteredTables.length}}</span>
+            </div>
+        </div>
+
+        <div class="col-md-9" ng-show="showTable" style="height: 100%; background-color: #fefefe; padding-top: 20px; padding-bottom: 70px;">
+            <div class="form-inline" style="margin-bottom: 10px;">
+                <a class="btn btn-sm btn-primary" ng-click="GenerateForm()" style="width: 80px;"><i class="fa fa-plus-circle"></i> Create</a>
+                <input type="text" class="input-sm form-control" style="float: right; width: 65%;" placeholder="Search record..." ng-model="searchRecord" />
+            </div>
+            <div style="height: 100% !important; overflow-y: auto;">
+                <table class="table table-hover table-striped table-bordered small">
+                    <thead>
+                        <tr>
+                            <th ng-repeat="column in columns">{{column.name}}</th>
+                            <th style="width: 70px;"></th>
+                            <th style="width: 70px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="row in filteredRows = (rows | filter: searchRecord) track by $index">
+                            <td ng-repeat="cell in row.cells track by $index">{{cell}}</td>
+                            <td><a class="btn btn-xs btn-warning" ng-click="GenerateForm(row.cells)" style="width: 70px;"><i class="fa fa-pencil"></i> Update</a></td>
+                            <td><a class="btn btn-xs btn-danger" ng-click="DeleteRecord(row.cells)" style="width: 70px;"><i class="fa fa-trash"></i> Delete</a></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="form-inline" style="height: 25px; background-color: #eaeaea; padding-top: 3px; padding-right: 20px; padding-left: 20px; border-bottom-left-radius: 3px; border-bottom-right-radius: 3px;">
+                <span style="float: right;">Number of records: {{filteredRows.length}}</span>
+            </div>
+
+
+            <!--form start-->
+            <form name="crudForm" class="slider slide-in fadeout" ng-show="showForm" ng-animate="slide" style="overflow-y: auto;">
+                <div class="col-md-3"></div>
+                <div class="col-md-6" style="padding-top: 15px; padding-bottom: 25px;">
+                    <h4>{{table.schema + '.' + table.name}} <i class="fa fa-close" style="float: right; cursor: pointer;" ng-click="showForm = false"></i></h4>
+                    <hr />
+                    <div ng-repeat="newCell in newCells" style="margin-bottom: 15px;">
+                        <!--int, float, decimal, bigint, smallint, tinyint, numeric-->
+                        <div ng-if="newCell.column.dataType === 'int' || newCell.column.dataType === 'float' || newCell.column.dataType === 'decimal' || newCell.column.dataType === 'bigint' || newCell.column.dataType === 'smallint' || newCell.column.dataType === 'tinyint' || newCell.column.dataType === 'numeric'" style="max-height: 350px !important; overflow-y: auto;">
+                            <span class="label label-{{newCell.column.isNullable ? 'default' : table.identityColumn === '' ? 'danger' : newCell.column.name === table.identityColumn ? 'default' : 'danger'}}" style="font-size: 12px; border-bottom-left-radius: 0; border-bottom-right-radius: 0;"><i class="fa fa-key" style="color: yellow;" ng-show="{{table.identityColumn === newCell.column.name}}"></i> <i class="fa fa-key" style="color: white;" ng-show="newCell.hasReference"></i> {{newCell.column.dataType + ': ' + newCell.column.name}}</span> <input style="border-top-left-radius: 0;" type="number" class="input form-control" ng-model="newCell.value" string-to-number maxlength="{{newCell.column.maxLength}}" ng-readonly="newCell.column.name === table.identityColumn" ng-hide="newCell.hasReference" ng-required="{{!newCell.column.isNullable && newCell.column.name !== table.identityColumn}}" />
+
+                            <table ng-show="newCell.hasReference" class="table table-hover table-striped table-bordered small">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 24px;"></th>
+                                        <th ng-repeat="referencedColumn in newCell.referencedColumns">{{referencedColumn.name}}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr ng-repeat="referencedRow in newCell.referencedRows" ng-click="CheckReferencedRow(newCell.referencedRows, $index, newCell)" style="cursor: pointer;">
+                                        <td><input type="checkbox" ng-model="referencedRow.checked" /></td>
+                                        <td ng-repeat="cell in referencedRow.cells track by $index">{{cell}}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!--nvarchar, varchar, nchar, char, ntext(if table has identity column), text(if table has identity column)-->
+                        <div ng-if="table.identityColumn !== ''">
+                            <div ng-if="newCell.column.dataType === 'ntext' || newCell.column.dataType === 'text'">
+                                <span class="label label-{{newCell.column.isNullable ? 'default' : table.identityColumn === '' ? 'danger' : newCell.column.name === table.identityColumn ? 'default' : 'danger'}}" style="font-size: 12px; border-bottom-left-radius: 0; border-bottom-right-radius: 0;"><i class="fa fa-key" style="color: yellow;" ng-show="{{table.identityColumn === newCell.column.name}}"></i> <i class="fa fa-key" style="color: white;" ng-show="newCell.hasReference"></i> {{newCell.column.dataType + ': ' + newCell.column.name}}</span> <textarea rows="1" style="border-top-left-radius: 0; resize: vertical;" type="text" class="input form-control" ng-model="newCell.value" maxlength="{{newCell.column.maxLength}}" ng-readonly="newCell.column.name === table.identityColumn" ng-hide="newCell.hasReference" ng-required="{{!newCell.column.isNullable && newCell.column.name !== table.identityColumn}}"></textarea>
+                            </div>
+                        </div>
+                        <div ng-if="newCell.column.dataType === 'nvarchar' || newCell.column.dataType === 'varchar' || newCell.column.dataType === 'nchar' || newCell.column.dataType === 'char'">
+                            <span class="label label-{{newCell.column.isNullable ? 'default' : table.identityColumn === '' ? 'danger' : newCell.column.name === table.identityColumn ? 'default' : 'danger'}}" style="font-size: 12px; border-bottom-left-radius: 0; border-bottom-right-radius: 0;"><i class="fa fa-key" style="color: yellow;" ng-show="{{table.identityColumn === newCell.column.name}}"></i> <i class="fa fa-key" style="color: white;" ng-show="newCell.hasReference"></i> {{newCell.column.dataType + ': ' + newCell.column.name}}</span> <textarea rows="1" style="border-top-left-radius: 0; resize: vertical;" type="text" class="input form-control" ng-model="newCell.value" maxlength="{{newCell.column.maxLength}}" ng-readonly="newCell.column.name === table.identityColumn" ng-hide="newCell.hasReference" ng-required="{{!newCell.column.isNullable && newCell.column.name !== table.identityColumn}}"></textarea>
+                        </div>
+
+                        <!--bit-->
+                        <div ng-if="newCell.column.dataType === 'bit'">
+                            <label for="{{newCell.column.name}}" class="label label-default" style="font-size: 12px;">{{newCell.column.dataType + ': ' + newCell.column.name}}</label> <input id="{{newCell.column.name}}" type="checkbox" ng-model="newCell.value" ng-checked="{{newCell.value === 'True' ? true : false}}" ng-click="ChangeCheckboxValue(newCell)" />
+                        </div>
+
+                        <!--datetime-->
+                        <div ng-if="newCell.column.dataType === 'datetime'">
+                            <span class="label label-{{newCell.column.isNullable ? 'default' : table.identityColumn === '' ? 'danger' : newCell.column.name === table.identityColumn ? 'default' : 'danger'}}" style="font-size: 12px; border-bottom-left-radius: 0; border-bottom-right-radius: 0;"><i class="fa fa-key" style="color: yellow;" ng-show="{{table.identityColumn === newCell.column.name}}"></i> <i class="fa fa-key" style="color: white;" ng-show="newCell.hasReference"></i> {{newCell.column.dataType + ': ' + newCell.column.name}}</span> <input type="text" class="form-control" style="border-top-left-radius: 0;" uib-datepicker-popup="{{dateTimeFormat}}" placeholder="dd.MM.yyyy HH:mm:ss" ng-model="newCell.value" ng-required="{{!newCell.column.isNullable && newCell.column.name !== table.identityColumn}}" />
+                        </div>
+
+                        <!--date-->
+                        <div ng-if="newCell.column.dataType === 'date'">
+                            <span class="label label-{{newCell.column.isNullable ? 'default' : table.identityColumn === '' ? 'danger' : newCell.column.name === table.identityColumn ? 'default' : 'danger'}}" style="font-size: 12px; border-bottom-left-radius: 0; border-bottom-right-radius: 0;"><i class="fa fa-key" style="color: yellow;" ng-show="{{table.identityColumn === newCell.column.name}}"></i> <i class="fa fa-key" style="color: white;" ng-show="newCell.hasReference"></i> {{newCell.column.dataType + ': ' + newCell.column.name}}</span> <input type="text" class="form-control" style="border-top-left-radius: 0;" uib-datepicker-popup="{{dateFormat}}" placeholder="dd.MM.yyyy" ng-model="newCell.value" ng-required="{{!newCell.column.isNullable && newCell.column.name !== table.identityColumn}}" />
+                        </div>
+                    </div>                    
+                    <hr />
+                    <div style="float: right;">
+                        <button type="submit" ng-disabled="crudForm.$invalid && {{table.identityColumn !== ''}}" class="btn btn-sm btn-success" ng-click="SaveRecord()" style="width: 80px; margin-right: 5px;"><i class="fa fa-save"></i> Save</button>
+                        <a class="btn btn-sm btn-default" ng-click="showForm = false" style="width: 80px;"><i class="fa fa-close"></i> Cancel</a>
+                    </div>
+                    <br /><br /><br />
+
+                    <div ng-repeat="dependantTable in dependantTables" style="margin-top: 20px; padding-top: 15px; padding-bottom: 15px; border-top: 1px solid #eee; border-bottom: 1px solid #eee;">
+                        <a ng-click="GetTableRecords(dependantTable, true)" style="cursor: pointer;" data-toggle="collapse" data-target="#{{dependantTable.schema + dependantTable.name}}">{{dependantTable.schema + '.' + dependantTable.name}}</a>
+                        <div id="{{dependantTable.schema + dependantTable.name}}" class="collapse">
+                            <div class="form-inline" style="margin-top: 10px; margin-bottom: 10px;">
+                                <input type="text" class="input-sm form-control" style="width: 100%;" placeholder="Search record..." ng-model="searchDependantRecord" />
+                            </div>
+                            <div style="max-height: 350px !important; overflow-y: auto;">
+                                <table class="table table-hover table-striped table-bordered small">
+                                    <thead>
+                                        <tr>
+                                            <th ng-repeat="dependantColumn in dependantTable.dependantColumns">{{dependantColumn.name}}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr ng-repeat="dependantRow in filteredDependantRows = (dependantTable.dependantRows | filter: searchDependantRecord) track by $index">
+                                            <td ng-repeat="cell in dependantRow.cells track by $index">{{cell}}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="form-inline" style="height: 25px; background-color: #eaeaea; padding-top: 3px; padding-right: 20px; padding-left: 20px; border-bottom-left-radius: 3px; border-bottom-right-radius: 3px;">
+                                <span style="float: right;">Number of records: {{filteredDependantRows.length}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3"></div>
+            </form>
+            <!--form end-->
+        </div>
+    </row>
+</div>
